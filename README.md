@@ -28,7 +28,6 @@ For licensing questions, contact: `support@tendrl.com`
 ## Features
 
 - 🐍 **Flexibility**: Works with any JSON-serializable type - strings, maps (any key/value types), structs, arrays, primitives - no complex formatting
-- ⚡ **Simple Periodic Publishing**: Easy background data collection
 - 💾 **Offline Message Storage**: BoltDB-based persistence with TTL
 - 🔄 **Automatic Retry**: Background retry process for offline messages
 - 🎯 **Resource Monitoring**: Automatic system resource adaptation
@@ -123,7 +122,6 @@ The Go SDK supports two operating modes:
 - ✅ **Automatic** offline storage with retry
 - ✅ **Automatic** background system monitoring
 - ✅ **Automatic** resource-aware batch optimization
-- ✅ **Optional** function tethering for periodic data collection
 
 ### ⚡ Direct API Mode
 
