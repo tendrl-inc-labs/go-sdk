@@ -92,3 +92,28 @@ type ConnectivityState struct {
 
 // DataFunc is a function that returns data to publish
 type DataFunc func() (interface{}, error)
+
+// IncomingMessage represents a message received from the server
+type IncomingMessage struct {
+	MsgType   string                 `json:"msg_type"`
+	Source    string                 `json:"source"`
+	Dest      string                 `json:"dest,omitempty"`
+	Timestamp string                 `json:"timestamp"`
+	Data      interface{}            `json:"data"`
+	Context   IncomingMessageContext `json:"context,omitempty"`
+	RequestID string                 `json:"request_id,omitempty"`
+}
+
+// IncomingMessageContext contains metadata for incoming messages
+type IncomingMessageContext struct {
+	Tags           []string               `json:"tags,omitempty"`
+	DynamicActions map[string]interface{} `json:"dynamicActions,omitempty"`
+}
+
+// MessageCheckResponse represents the response from the message check endpoint
+type MessageCheckResponse struct {
+	Messages []IncomingMessage `json:"messages,omitempty"`
+}
+
+// MessageCallback is a function type for handling incoming messages
+type MessageCallback func(IncomingMessage) error
