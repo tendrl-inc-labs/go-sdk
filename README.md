@@ -47,7 +47,7 @@ For licensing questions, contact: `support@tendrl.com`
 ## Installation
 
 ```bash
-go get github.com/tendrl-inc/clients/tendrl_go_sdk
+go get github.com/tendrl-inc-labs/go-sdk@latest
 ```
 
 ## Configuration
