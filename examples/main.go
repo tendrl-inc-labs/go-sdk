@@ -38,6 +38,38 @@ func generateUserData() (interface{}, error) {
 	}, nil
 }
 
+// Example command handler function (referenced in callback documentation)
+func handleCommand(message tendrl.IncomingMessage) error {
+	// Extract command details from message data
+	if dataMap, ok := message.Data.(map[string]interface{}); ok {
+		if cmd, exists := dataMap["command"]; exists {
+			fmt.Printf("🎯 Executing command: %s\n", cmd)
+
+			switch cmd {
+			case "restart":
+				fmt.Println("   🔄 Simulating service restart...")
+				time.Sleep(1 * time.Second)
+				fmt.Println("   ✅ Service restarted successfully")
+
+			case "health_check":
+				fmt.Println("   🏥 Performing health check...")
+				fmt.Println("   ✅ System is healthy")
+
+			case "get_status":
+				fmt.Println("   📊 Getting system status...")
+				fmt.Println("   ✅ Status: running, uptime: 24h")
+
+			default:
+				return fmt.Errorf("unknown command: %s", cmd)
+			}
+
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid command format")
+}
+
 func main() {
 	// Check for demo mode
 	demoMode := len(os.Args) > 1 && os.Args[1] == "demo"
@@ -72,8 +104,11 @@ func main() {
 		switch message.MsgType {
 		case "command":
 			fmt.Printf("   ⚡ Processing command: %v\n", message.Data)
-			// Here you would implement command processing logic
-			// For example: execute system commands, update configurations, etc.
+			// Use our example command handler function
+			if err := handleCommand(message); err != nil {
+				fmt.Printf("   ❌ Command failed: %v\n", err)
+				return err
+			}
 
 		case "notification":
 			fmt.Printf("   📢 Received notification: %v\n", message.Data)

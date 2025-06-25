@@ -4,7 +4,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.16+-00ADD8.svg)](https://golang.org/doc/devel/release.html)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
-A simple, flexible SDK for high-performance messaging with Python-like ease of use.
+A simple, flexible SDK for high-performance messaging.
 
 ## ⚠️ License Notice
 
@@ -84,38 +84,13 @@ client, err := tendrl.NewClient(false, "your_api_key_here")
 - `true` = Managed mode (full features: queuing, batching, offline storage) - **Recommended**
 - `false` = Direct API mode (immediate API calls only)
 
-### 4. User-Agent Information
-
-The SDK automatically includes detailed platform information in requests:
-
-```go
-// Get platform information
-fmt.Printf("Platform: %s\n", tendrl.GetPlatformInfo())
-// Output: Go/1.21.0; Linux (Ubuntu 22.04 LTS; amd64)
-
-// Full User-Agent string  
-fmt.Printf("User-Agent: %s\n", tendrl.BuildUserAgent())
-// Output: tendrl-go-sdk/0.1.0 (Go/1.21.0; Linux (Ubuntu 22.04 LTS; amd64))
-
-// Get SDK version
-fmt.Printf("Version: %s\n", tendrl.GetVersion())
-// Output: 0.1.0
-```
-
-**Platform Detection:**
-
-- **Linux**: Detects distribution from `/etc/os-release`
-- **macOS**: Shows macOS with architecture
-- **Windows**: Shows Windows with architecture
-- **Other**: Shows OS/architecture
-
 ## Operating Modes
 
 The Go SDK supports two operating modes:
 
 ### 🚀 Managed Mode (Default & Recommended)
 
-**Full-featured with automatic background processing**
+#### Full-featured with automatic background processing
 
 - ✅ **Automatic** API key validation on startup
 - ✅ **Automatic** message queuing and dynamic batching
@@ -125,7 +100,7 @@ The Go SDK supports two operating modes:
 
 ### ⚡ Direct API Mode
 
-**Lightweight immediate API calls**
+#### Lightweight immediate API calls
 
 - ✅ Direct HTTP requests only
 - ✅ No background processes
@@ -144,7 +119,7 @@ import (
     "log"
     "time"
     
-    tendrl "github.com/tendrl-inc/clients/tendrl_sdk/tendrl"
+    tendrl "github.com/tendrl-inc-labs/go-sdk/tendrl"
 )
 
 func main() {
@@ -154,29 +129,6 @@ func main() {
         log.Fatal(err)
     }
     defer client.Stop()
-
-    // Python SDK-compatible API!
-    // 1. Async publishing
-    err = client.PublishAsync("Simple message", []string{"logs"})
-    
-    // 2. Synchronous with response
-    messageID, err := client.Publish(
-        map[string]interface{}{
-            "event": "user_signup",
-            "user_id": "12345",
-            "timestamp": time.Now().Unix(),
-        }, 
-        []string{"users", "events"}, 
-        "",    // entity (empty for default)
-        true,  // wait_response
-        10,    // timeout seconds
-    )
-    if err == nil {
-        log.Printf("Message ID: %s", messageID)
-    }
-    
-    // Keep running for demo
-    time.Sleep(2 * time.Minute)
 }
 ```
 
@@ -189,7 +141,7 @@ import (
     "log"
     "time"
     
-    tendrl "github.com/tendrl-inc/clients/tendrl_sdk/tendrl"
+    tendrl "github.com/tendrl-inc-labs/go-sdk/tendrl"
 )
 
 func main() {
@@ -199,57 +151,20 @@ func main() {
         log.Fatal(err)
     }
     defer client.Stop()
-
-    // Show enhanced User-Agent with platform info
-    log.Printf("User-Agent: %s", tendrl.BuildUserAgent())
-    // Output: tendrl-go-sdk/0.1.0 (Go/1.21.0; macOS/arm64)
-
-    // Same API as before
-    err = client.PublishAsync("API key demo", []string{"demo"})
-    if err != nil {
-        log.Printf("Failed to publish: %v", err)
-    }
 }
 ```
 
 ## API Reference
 
-### Client Configuration
-
-```go
-// Managed mode (default & recommended) - full features
-client, err := tendrl.NewClient(true, "")
-
-// Direct API mode - immediate API calls only
-client, err := tendrl.NewClient(false, "")
-
-// Managed mode features (all automatic):
-// - API key from TENDRL_KEY environment variable or parameter
-// - API key validation on startup (GET /claims)
-// - Message queuing and dynamic batching (10-500 messages)
-// - Offline storage enabled (tendrl_storage.db)
-// - Automatic retry every 30 seconds
-// - Background system monitoring
-// - 10 second HTTP timeout, 3 max retries
-// - Queue processing and batch optimization
-
-// Direct API mode features:
-// - API key from TENDRL_KEY environment variable or parameter
-// - Direct HTTP requests only
-// - 10 second HTTP timeout, 3 max retries
-// - No background processes or storage
-```
-
 ### Publishing Messages
 
 ```go
-// Python SDK-compatible API
-// Publish with optional response waiting (matches Python SDK exactly)
+// Publish with optional response waiting
 messageID, err := client.Publish(
     data,                  // Any data type
     []string{"tag1", "tag2"}, // Tags
     "entity_name",         // Target entity (empty string for default)
-    true,                  // wait_response (like Python SDK)
+    true,                  // wait_response
     10,                    // timeout in seconds
 ) // Returns message ID if wait_response=True
 
@@ -259,6 +174,51 @@ err := client.PublishAsync(data, []string{"tag1", "tag2"})
 // All publishing goes through the main Publish method
 // which handles both sync and async cases automatically
 ```
+
+### Message Callbacks
+
+```go
+// Set up callback to handle incoming messages (managed mode only for auto-checking)
+client.SetMessageCallback(func(message tendrl.IncomingMessage) error {
+    // Process incoming message
+    fmt.Printf("Received: %s from %s\n", message.MsgType, message.Source)
+    return nil // Return error if processing fails
+})
+
+// Configure checking behavior (optional)
+client.SetMessageCheckRate(5 * time.Second)  // Check every 5 seconds (default: 3)
+client.SetMessageCheckLimit(10)              // Max messages per check (default: 1)
+
+// Manual message check (works in any mode)
+err := client.CheckMessages()
+```
+
+### IncomingMessage Structure
+
+| Field | Type | Description | Required |
+|-------|------|-------------|----------|
+| `msg_type` | `string` | Message type identifier (e.g., "command", "notification", "alert") | ✅ Yes |
+| `source` | `string` | Sender's resource path (set by server) | ✅ Yes |
+| `dest` | `string` | Destination entity identifier | ❌ Optional |
+| `timestamp` | `string` | RFC3339 timestamp (set by server) | ✅ Yes |
+| `data` | `interface{}` | The actual message payload (can be any JSON type) | ✅ Yes |
+| `context` | `IncomingMessageContext` | Message metadata | ❌ Optional |
+| `request_id` | `string` | Request identifier (if message was a request) | ❌ Optional |
+
+### Message Context Structure
+
+| Field | Type | Description | Required |
+|-------|------|-------------|----------|
+| `tags` | `[]string` | Message tags for categorization | ❌ Optional |
+| `dynamicActions` | `map[string]interface{}` | Server-side validation results | ❌ Optional |
+
+#### How It Works
+
+1. **Background Checking**: In managed mode, the SDK automatically checks for messages every 3 seconds (configurable)
+2. **Manual Checking**: You can call `CheckMessages()` manually in any mode
+3. **Callback Execution**: Your callback function is called for each incoming message
+4. **Error Handling**: Failed callbacks don't stop other message processing
+5. **Connectivity Aware**: Automatically handles network failures and updates connectivity state
 
 ### Tethering Functions to the Cloud
 
@@ -296,7 +256,7 @@ defer stopAppMetrics()
 
 ### Flexible Data Types
 
-The SDK works with any JSON-serializable data type, giving you Python-like flexibility:
+The SDK works with any JSON-serializable data type:
 
 ```go
 // Strings stay as strings
@@ -388,50 +348,14 @@ fmt.Printf("CPU: %.1f%%, Memory: %.1f%%, Queue: %.1f%%\n",
 stats := client.GetOfflineStorageStats()
 fmt.Printf("Offline messages: %d, Retry enabled: %v\n",
     stats.MessageCount, stats.RetryEnabled)
-```
 
-## Capacity Planning
-
-### Sizing Guidelines
-
-**All Applications:**
-
-```go
-// One size fits all! The SDK automatically adapts to your load
-client, _ := tendrl.NewClient()
-
-// Features that scale automatically:
-// - Dynamic batching based on CPU/memory usage
-// - Adaptive queue management
-// - Automatic retry with backoff
-// - Offline storage for reliability
-```
-
-**Performance Characteristics:**
-
-```go
-client, _ := tendrl.NewClient()
-
-// Automatically optimizes for your workload:
-// Light load:  10-50 messages/batch, low latency
-// Heavy load:  100-500 messages/batch, high throughput
-// CPU stress:  Reduces batch size to maintain responsiveness
-// Memory full: Activates offline storage to prevent data loss
+// Get connectivity state
+connectivity := client.GetConnectivityState()
+fmt.Printf("Online: %v, Last Check: %v\n",
+    connectivity.Online, connectivity.LastCheck.Format("15:04:05"))
 ```
 
 ## Offline Storage & Retry
-
-The SDK automatically handles network outages:
-
-```go
-// No configuration needed - offline storage enabled by default!
-client, err := tendrl.NewClient()
-
-// Monitor offline storage status
-stats := client.GetOfflineStorageStats()
-fmt.Printf("Messages pending: %d, Retry enabled: %v\n", 
-    stats.MessageCount, stats.RetryEnabled)
-```
 
 **Offline Retry Flow:**
 
