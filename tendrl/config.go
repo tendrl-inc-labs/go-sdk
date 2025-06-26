@@ -299,12 +299,7 @@ func getWindowsInfo() string {
 
 // extractField extracts a field value from os-release format
 func extractField(content, field string) string {
-	lines := []string{}
-	for _, line := range []string{content} {
-		for _, l := range splitLines(line) {
-			lines = append(lines, l)
-		}
-	}
+	lines := splitLines(content)
 
 	for _, line := range lines {
 		if len(line) > len(field)+1 && line[:len(field)] == field && line[len(field)] == '=' {
@@ -342,8 +337,7 @@ func splitLines(content string) []string {
 
 // BuildUserAgent creates a User-Agent string similar to the Python client
 func BuildUserAgent() string {
-	platformInfo := GetPlatformInfo()
-	return fmt.Sprintf("tendrl-go-sdk/%s (%s)", version, platformInfo)
+	return fmt.Sprintf("tendrl-go-sdk/%s", version)
 }
 
 // GetVersion returns the SDK version (hardcoded in module, not user-configurable)
