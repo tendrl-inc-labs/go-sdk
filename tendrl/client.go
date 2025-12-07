@@ -2,6 +2,7 @@ package tendrl
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -10,6 +11,13 @@ import (
 )
 
 var version = "0.1.0"
+
+// debugLog logs a debug message if debug mode is enabled
+func (c *Client) debugLog(format string, args ...interface{}) {
+	if c.config != nil && c.config.Debug {
+		log.Printf("[DEBUG] "+format, args...)
+	}
+}
 
 type Client struct {
 	apiKey     string
@@ -30,6 +38,9 @@ type Client struct {
 	checkMsgRate  time.Duration // How often to check for messages
 	checkMsgLimit int           // Maximum number of messages to retrieve per check
 	lastMsgCheck  time.Time     // Last time messages were checked
+
+	// Heartbeat functionality
+	lastHeartbeat time.Time // Last time heartbeat was sent
 }
 
 // NewClient creates a new Tendrl client
@@ -66,6 +77,7 @@ func NewClientWithModeAndAPIKey(managed bool, apiKey string) (*Client, error) {
 		checkMsgRate:  3 * time.Second, // Default: check every 3 seconds
 		checkMsgLimit: 1,               // Default: get 1 message per check
 		lastMsgCheck:  time.Now(),
+		lastHeartbeat: time.Now(), // Initialize heartbeat timer
 	}
 
 	// Initialize managed mode components only if needed
@@ -164,6 +176,7 @@ func NewClientWithConfigAndAPIKey(configPath string, apiKey string) (*Client, er
 		checkMsgRate:  3 * time.Second, // Default: check every 3 seconds
 		checkMsgLimit: 1,               // Default: get 1 message per check
 		lastMsgCheck:  time.Now(),
+		lastHeartbeat: time.Now(), // Initialize heartbeat timer
 	}
 
 	// Initialize managed mode components only if needed
@@ -256,12 +269,15 @@ func (c *Client) setupAPIConfig() error {
 
 	// Set base URL (hardcoded for Tendrl service)
 	c.baseURL = "https://app.tendrl.com/api"
+	c.debugLog("API base URL: %s", c.baseURL)
 
 	// Validate API key in managed mode
 	if c.config.Managed {
+		c.debugLog("Validating API key")
 		if err := c.validateAPIKey(); err != nil {
 			return fmt.Errorf("API key validation failed: %w", err)
 		}
+		c.debugLog("API key validated successfully")
 	}
 
 	return nil
@@ -359,6 +375,7 @@ func (c *Client) GetConnectivityState() ConnectivityState {
 }
 
 func (c *Client) Stop() {
+	c.debugLog("TendrlClient stopping")
 	if c.config.Managed {
 		if c.done != nil {
 			close(c.done)
@@ -368,6 +385,7 @@ func (c *Client) Stop() {
 		}
 		c.wg.Wait()
 	}
+	c.debugLog("TendrlClient stopped")
 }
 
 // Tether attaches a function to run periodically and publish results to the cloud.

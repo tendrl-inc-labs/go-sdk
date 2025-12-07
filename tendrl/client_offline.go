@@ -60,10 +60,15 @@ func (c *Client) retryOfflineMessages() {
 
 			// Convert stored message back to Message format
 			msg := Message{
-				Data: storedMsg.Data,
-				Context: MessageContext{
+				MsgType:   "publish", // Default message type for stored messages
+				Data:      storedMsg.Data,
+				Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+			}
+			// Only add context if tags exist
+			if len(storedMsg.Tags) > 0 {
+				msg.Context = &MessageContext{
 					Tags: storedMsg.Tags,
-				},
+				}
 			}
 			batch = append(batch, msg)
 			idsToDelete = append(idsToDelete, id)

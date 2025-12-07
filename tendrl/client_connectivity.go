@@ -34,6 +34,7 @@ func (c *Client) monitorConnectivity() {
 
 // checkConnectivity performs a lightweight connectivity check
 func (c *Client) checkConnectivity() {
+	c.debugLog("Checking connectivity")
 	// Try a quick HEAD request to the API
 	endpoint, err := url.JoinPath(c.baseURL, "/health")
 	if err != nil {
@@ -77,8 +78,10 @@ func (c *Client) updateConnectivityState(online bool) {
 	c.connectivity.Online = online
 
 	if online && !wasOnline {
+		c.debugLog("Connectivity changed: offline -> online")
 		c.connectivity.LastOnline = now
 	} else if !online && wasOnline {
+		c.debugLog("Connectivity changed: online -> offline")
 		c.connectivity.LastOffline = now
 	}
 }

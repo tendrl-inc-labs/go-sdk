@@ -28,8 +28,9 @@ func (c *Client) CheckMessages() error {
 	if c.callback == nil {
 		return nil // No callback set, nothing to do
 	}
+	c.debugLog("Checking for incoming messages (limit=%d)", c.checkMsgLimit)
 
-	// Construct the check messages endpoint
+	// Construct the check messages endpoint (already correct)
 	endpoint, err := url.JoinPath(c.baseURL, "/entities/check_messages")
 	if err != nil {
 		return fmt.Errorf("failed to construct check messages endpoint URL: %w", err)
@@ -80,8 +81,11 @@ func (c *Client) CheckMessages() error {
 		}
 
 		// Call callback for each message
+		c.debugLog("Received %d message(s)", len(response.Messages))
 		for _, message := range response.Messages {
+			c.debugLog("Processing message: type=%s, source=%s", message.MsgType, message.Source)
 			if err := c.callback(message); err != nil {
+				c.debugLog("Callback error for message: %v", err)
 				// Continue processing other messages even if one callback fails
 				// You might want to log this error depending on your needs
 				continue

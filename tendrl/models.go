@@ -30,23 +30,32 @@ type Config struct {
 	// Connectivity monitoring
 	ConnectivityCheckEnabled  bool          // Enable background connectivity checks
 	ConnectivityCheckInterval time.Duration // How often to check connectivity
+
+	// Heartbeat configuration
+	SendHeartbeat     bool          // Enable automatic heartbeat messages (default: true in managed mode)
+	HeartbeatInterval time.Duration // Interval between heartbeats (default: 30 seconds)
+
+	// Debug configuration
+	Debug bool // Enable debug logging (default: false)
 }
 
 // Message represents a message to be sent to Tendrl
+// Matches Python SDK Message model format
 type Message struct {
-	Data        interface{}    `json:"data,omitempty"`
-	Context     MessageContext `json:"context,omitempty"`
-	MsgType     string         `json:"msg_type,omitempty"`
-	Destination string         `json:"dest,omitempty"`
-	Timestamp   string         `json:"timestamp,omitempty"`
+	MsgType     string          `json:"msg_type"`            // Message type: "publish", "heartbeat", "cmd", etc.
+	Data        interface{}     `json:"data"`                // Message payload
+	Context     *MessageContext `json:"context,omitempty"`   // Optional context (tags, wait, etc.)
+	Destination string          `json:"dest,omitempty"`      // Destination entity for cross-account messaging
+	Timestamp   string          `json:"timestamp,omitempty"` // ISO8601 timestamp (set automatically if empty)
 }
 
 // MessageContext contains message metadata
+// Matches Python SDK Context model
 type MessageContext struct {
-	Tags         []string `json:"tags,omitempty"`
-	Entity       string   `json:"entity,omitempty"`
-	WaitResponse bool     `json:"wait,omitempty"`
-	Timeout      int      `json:"timeout,omitempty"`
+	Tags         []string `json:"tags,omitempty"`    // Tags for flow triggering
+	WaitResponse bool     `json:"wait,omitempty"`    // Whether to wait for response
+	Timeout      int      `json:"timeout,omitempty"` // Response timeout in seconds
+	// Note: Entity field removed - use dest field in Message for cross-account messaging
 }
 
 // BatchResponse represents the response from a batch message send
