@@ -235,3 +235,33 @@ func (c *Client) sendMessages(messages []Message, waitResponse bool) (string, er
 
 	return "", lastErr
 }
+
+// PublishCrossAccount sends a message to another entity (cross-account messaging)
+// destination should be in format: "account:region:type:name"
+// This matches Python SDK's publish_cross_account_message
+func (c *Client) PublishCrossAccount(data interface{}, destination string, tags []string) error {
+	c.debugLog("Publishing cross-account message (destination=%s, tags=%v)", destination, tags)
+	msg := Message{
+		MsgType:     "cmd", // Cross-account messages use "cmd" type
+		Data:        data,
+		Destination: destination,
+		Timestamp:   time.Now().UTC().Format(time.RFC3339Nano),
+	}
+
+	// Add context if tags are provided
+	if len(tags) > 0 {
+		msg.Context = &MessageContext{
+			Tags: tags,
+		}
+	}
+
+	// Send immediately for cross-account messages
+	if !c.config.Managed {
+		_, err := c.sendMessages([]Message{msg}, false)
+		return err
+	}
+
+	// In managed mode, send directly (bypass queue for immediate delivery)
+	_, err := c.sendMessages([]Message{msg}, false)
+	return err
+}

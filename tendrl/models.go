@@ -113,6 +113,14 @@ type IncomingMessage struct {
 	RequestID string                 `json:"request_id,omitempty"`
 }
 
+// HeartbeatData represents system resource information for heartbeat messages
+type HeartbeatData struct {
+	MemFree  float64 `json:"mem_free"`  // Available RAM in bytes
+	MemTotal float64 `json:"mem_total"` // Total RAM in bytes
+	DiskFree float64 `json:"disk_free"` // Available filesystem space in bytes
+	DiskSize float64 `json:"disk_size"` // Total filesystem size in bytes
+}
+
 // IncomingMessageContext contains metadata for incoming messages
 type IncomingMessageContext struct {
 	Tags           []string               `json:"tags,omitempty"`
