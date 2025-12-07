@@ -48,6 +48,10 @@ func (c *Client) checkConnectivity() {
 		return
 	}
 
+	// Set headers (consistent with other requests)
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("User-Agent", BuildUserAgent())
+
 	// Use a very short timeout for connectivity checks
 	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Do(req)
