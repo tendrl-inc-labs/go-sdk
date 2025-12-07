@@ -47,9 +47,19 @@ type Client struct {
 
 // NewClient creates a new Tendrl client
 // managed: true for managed mode (full features: queuing, batching, offline storage), false for headless mode (direct API calls)
-// apiKey: API key for authentication (empty string to use TENDRL_KEY environment variable)
-func NewClient(managed bool, apiKey string) (*Client, error) {
-	return NewClientWithModeAndAPIKey(managed, apiKey)
+// apiKey: Optional API key for authentication. If not provided or empty, will use TENDRL_KEY environment variable
+func NewClient(managed bool, apiKey ...string) (*Client, error) {
+	key := ""
+	if len(apiKey) > 0 {
+		key = apiKey[0]
+	}
+	return NewClientWithModeAndAPIKey(managed, key)
+}
+
+// NewClientWithMode creates a new Tendrl client using the TENDRL_KEY environment variable
+// managed: true for managed mode (full features: queuing, batching, offline storage), false for headless mode (direct API calls)
+func NewClientWithMode(managed bool) (*Client, error) {
+	return NewClientWithModeAndAPIKey(managed, "")
 }
 
 // NewClientWithModeAndAPIKey creates a new Tendrl client with the specified mode and API key

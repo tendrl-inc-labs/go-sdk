@@ -1,7 +1,7 @@
 # Tendrl Go SDK
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/tendrl-inc/clients/tendrl_go_sdk)
-[![Go Version](https://img.shields.io/badge/go-1.16+-00ADD8.svg)](https://golang.org/doc/devel/release.html)
+[![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/doc/devel/release.html)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 A simple, flexible SDK for high-performance messaging.
@@ -69,8 +69,14 @@ For programmatic use, you can pass the API key directly:
 // Managed mode with API key parameter (recommended)
 client, err := tendrl.NewClient(true, "your_api_key_here")
 
+// Managed mode using environment variable (apiKey is optional)
+client, err := tendrl.NewClient(true)
+
 // Direct API mode with API key parameter  
 client, err := tendrl.NewClient(false, "your_api_key_here")
+
+// Direct API mode using environment variable
+client, err := tendrl.NewClient(false)
 ```
 
 ### 3. Configuration Priority
@@ -146,7 +152,7 @@ When debug mode is enabled, the SDK logs:
 
 ### Example Debug Output
 
-```
+```bash
 [DEBUG] TendrlClient initialized (managed=true, debug=true)
 [DEBUG] API base URL: https://app.tendrl.com/api
 [DEBUG] Validating API key
@@ -220,7 +226,7 @@ import (
 
 func main() {
     // Create managed client (reads TENDRL_KEY environment variable)
-    client, err := tendrl.NewClient(true, "") // true = managed mode, "" = use env var
+    client, err := tendrl.NewClient(true) // true = managed mode, apiKey optional - uses TENDRL_KEY env var
     if err != nil {
         log.Fatal(err)
     }
@@ -507,12 +513,13 @@ client, err := tendrl.NewClientWithConfigAndAPIKey("config.json", "api_key")
 ```
 
 **Heartbeat Features:**
-- ✅ Automatically enabled in managed mode
-- ✅ Uses real system metrics (memory and disk)
-- ✅ Sends every 30 seconds by default
-- ✅ Configurable interval
-- ✅ Disabled in headless mode
-- ✅ Gracefully handles errors (won't break client if heartbeat fails)
+
+- Automatically enabled in managed mode
+- Uses real system metrics (memory and disk)
+- Sends every 30 seconds by default
+- Configurable interval
+- Disabled in headless mode
+- Gracefully handles errors (won't break client if heartbeat fails)
 
 ## Offline Storage & Retry
 
@@ -530,6 +537,7 @@ The SDK automatically stores messages in BoltDB when the network is unavailable 
 - This prevents indefinite storage of old messages that may no longer be relevant
 
 **TTL Behavior:**
+
 - Messages stored when offline: TTL starts from storage timestamp
 - If a message expires before it can be sent, it's automatically deleted
 - No manual cleanup required - the SDK handles expiration automatically
@@ -563,8 +571,6 @@ The SDK supports environment variables for configuration:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `TENDRL_KEY` | API key for authentication | "" |
-| `TENDRL_STORAGE_PATH` | Custom path for offline storage | "./tendrl_storage.db" |
-| `TENDRL_DEBUG` | Enable debug logging | false |
 
 **API Key Priority:**
 
@@ -576,10 +582,9 @@ The SDK supports environment variables for configuration:
 ```bash
 # Traditional environment variable method
 export TENDRL_KEY="your_api_key_here"
-
-# Custom storage path
-export TENDRL_STORAGE_PATH="/custom/path/storage.db"
 ```
+
+**Note:** For storage path and debug settings, use the config file instead of environment variables. See [Configuration File](#4-configuration-file) section.
 
 ## Error Handling
 
@@ -603,10 +608,10 @@ for attempts := 0; attempts < 3; attempts++ {
 ```go
 // ✅ Good: Use environment variables or parameters for API keys
 export TENDRL_KEY=your_api_key_here
-client, _ := tendrl.NewClient()  // Reads TENDRL_KEY automatically
+client, _ := tendrl.NewClient(true)  // Reads TENDRL_KEY automatically
 
 // ✅ Good: Pass API key as parameter
-client, _ := tendrl.NewClientWithAPIKey("your_api_key_here")
+client, _ := tendrl.NewClient(true, "your_api_key_here")
 
 // ❌ Avoid: API keys are NOT stored in config files for security
 // Config files only contain non-sensitive settings
@@ -614,7 +619,7 @@ client, _ := tendrl.NewClientWithAPIKey("your_api_key_here")
 
 ## Compatibility
 
-- Go 1.16+
+- Go 1.21+
 - All major operating systems (Linux, macOS, Windows)
 - Both amd64 and arm64 architectures
 

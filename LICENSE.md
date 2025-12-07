@@ -1,4 +1,4 @@
-MIT License with Commons Clause and Client Use Restriction  
+MIT License with Commons Clause and Client Use Restriction
 Copyright (c) Tendrl, Inc. 2025
 
 Permission is hereby granted, free of charge, to any person obtaining a copy  
