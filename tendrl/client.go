@@ -1,6 +1,8 @@
 package tendrl
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -153,6 +155,9 @@ func NewClientWithModeAndAPIKey(managed bool, apiKey string) (*Client, error) {
 
 		// Start message checking if callback is set
 		client.startMessageChecking()
+
+		// Update entity status to online
+		client.updateEntityStatus(true)
 	}
 
 	return client, nil
@@ -252,6 +257,9 @@ func NewClientWithConfigAndAPIKey(configPath string, apiKey string) (*Client, er
 
 		// Start message checking if callback is set
 		client.startMessageChecking()
+
+		// Update entity status to online
+		client.updateEntityStatus(true)
 	}
 
 	return client, nil
@@ -376,6 +384,12 @@ func (c *Client) GetConnectivityState() ConnectivityState {
 
 func (c *Client) Stop() {
 	c.debugLog("TendrlClient stopping")
+
+	// Update entity status to offline
+	if c.config.Managed {
+		c.updateEntityStatus(false)
+	}
+
 	if c.config.Managed {
 		if c.done != nil {
 			close(c.done)
@@ -386,6 +400,54 @@ func (c *Client) Stop() {
 		c.wg.Wait()
 	}
 	c.debugLog("TendrlClient stopped")
+}
+
+// updateEntityStatus updates the entity's online/offline status on the backend
+// This is called automatically on client start (online=true) and stop (online=false)
+func (c *Client) updateEntityStatus(online bool) {
+	endpoint, err := url.JoinPath(c.baseURL, "/entities/status")
+	if err != nil {
+		c.debugLog("Failed to construct status endpoint URL: %v", err)
+		return
+	}
+
+	// Create request body
+	requestBody := map[string]bool{"online": online}
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		c.debugLog("Failed to marshal status request: %v", err)
+		return
+	}
+
+	req, err := http.NewRequest("PUT", endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		c.debugLog("Failed to create status update request: %v", err)
+		return
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("User-Agent", BuildUserAgent())
+
+	// Execute request with a short timeout
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.debugLog("Error updating entity status: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		status := "offline"
+		if online {
+			status = "online"
+		}
+		c.debugLog("Entity status updated to %s", status)
+	} else {
+		c.debugLog("Failed to update entity status: %d %s", resp.StatusCode, resp.Status)
+	}
 }
 
 // Tether attaches a function to run periodically and publish results to the cloud.
