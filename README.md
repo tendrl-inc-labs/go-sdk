@@ -516,10 +516,28 @@ client, err := tendrl.NewClientWithConfigAndAPIKey("config.json", "api_key")
 
 ## Offline Storage & Retry
 
+The SDK automatically stores messages in BoltDB when the network is unavailable and retries sending them when connectivity is restored.
+
+### Message TTL (Time To Live)
+
+**All offline messages have a TTL of 1 hour (3600 seconds).**
+
+- Messages stored offline are automatically assigned a 1-hour expiration time
+- Expired messages are automatically cleaned up and will not be retried
+- TTL cleanup happens:
+  - Periodically during queue processing
+  - During retry operations (expired messages are skipped and deleted)
+- This prevents indefinite storage of old messages that may no longer be relevant
+
+**TTL Behavior:**
+- Messages stored when offline: TTL starts from storage timestamp
+- If a message expires before it can be sent, it's automatically deleted
+- No manual cleanup required - the SDK handles expiration automatically
+
 **Offline Retry Flow:**
 
 ```sh
-Network Down → Store Messages in BoltDB
+Network Down → Store Messages in BoltDB (with 1-hour TTL)
                         ↓
             Background Retry Process (every 15-30s)
                         ↓
@@ -527,6 +545,8 @@ Network Down → Store Messages in BoltDB
                         ↓ Yes
                 Retrieve Stored Messages
                         ↓
+            Check TTL ──Expired──→ Delete & Skip
+                        ↓ Valid
                   Send in Batches
                         ↓
                    Success? ──No──→ Keep for Next Retry
