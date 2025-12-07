@@ -49,6 +49,7 @@ func (c *Client) calculateDynamicBatchSize() int {
 
 // processQueue processes messages from the queue in dynamic batches
 func (c *Client) processQueue() {
+	c.debugLog("Starting queue processor")
 	batch := make([]Message, 0, c.config.MaxBatchSize)
 	ticker := time.NewTicker(c.config.MinBatchInterval)
 	defer ticker.Stop()
@@ -63,10 +64,14 @@ func (c *Client) processQueue() {
 					// Store failed messages
 					for _, m := range batch {
 						if dataStr, err := c.dataAsString(m.Data); err == nil {
+							var tags []string
+							if m.Context != nil {
+								tags = m.Context.Tags
+							}
 							c.storage.Store(
 								time.Now().Format(time.RFC3339),
 								dataStr,
-								m.Context.Tags,
+								tags,
 								3600,
 							)
 						}
@@ -81,10 +86,14 @@ func (c *Client) processQueue() {
 					// Store failed messages
 					for _, m := range batch {
 						if dataStr, err := c.dataAsString(m.Data); err == nil {
+							var tags []string
+							if m.Context != nil {
+								tags = m.Context.Tags
+							}
 							c.storage.Store(
 								time.Now().Format(time.RFC3339),
 								dataStr,
-								m.Context.Tags,
+								tags,
 								3600,
 							)
 						}
@@ -95,6 +104,17 @@ func (c *Client) processQueue() {
 
 			if c.storage != nil {
 				c.storage.CleanupExpired()
+			}
+
+			// Send heartbeat if enabled and interval has passed
+			if c.config.SendHeartbeat && c.IsOnline() {
+				currentTime := time.Now()
+				if currentTime.Sub(c.lastHeartbeat) >= c.config.HeartbeatInterval {
+					if err := c.sendHeartbeat(); err == nil {
+						c.lastHeartbeat = currentTime
+					}
+					// Don't fail on heartbeat errors - they shouldn't break the client
+				}
 			}
 
 		case <-c.done:

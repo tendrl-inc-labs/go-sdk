@@ -1,7 +1,10 @@
 package tendrl
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -10,6 +13,13 @@ import (
 )
 
 var version = "0.1.0"
+
+// debugLog logs a debug message if debug mode is enabled
+func (c *Client) debugLog(format string, args ...interface{}) {
+	if c.config != nil && c.config.Debug {
+		log.Printf("[DEBUG] "+format, args...)
+	}
+}
 
 type Client struct {
 	apiKey     string
@@ -30,13 +40,26 @@ type Client struct {
 	checkMsgRate  time.Duration // How often to check for messages
 	checkMsgLimit int           // Maximum number of messages to retrieve per check
 	lastMsgCheck  time.Time     // Last time messages were checked
+
+	// Heartbeat functionality
+	lastHeartbeat time.Time // Last time heartbeat was sent
 }
 
 // NewClient creates a new Tendrl client
 // managed: true for managed mode (full features: queuing, batching, offline storage), false for headless mode (direct API calls)
-// apiKey: API key for authentication (empty string to use TENDRL_KEY environment variable)
-func NewClient(managed bool, apiKey string) (*Client, error) {
-	return NewClientWithModeAndAPIKey(managed, apiKey)
+// apiKey: Optional API key for authentication. If not provided or empty, will use TENDRL_KEY environment variable
+func NewClient(managed bool, apiKey ...string) (*Client, error) {
+	key := ""
+	if len(apiKey) > 0 {
+		key = apiKey[0]
+	}
+	return NewClientWithModeAndAPIKey(managed, key)
+}
+
+// NewClientWithMode creates a new Tendrl client using the TENDRL_KEY environment variable
+// managed: true for managed mode (full features: queuing, batching, offline storage), false for headless mode (direct API calls)
+func NewClientWithMode(managed bool) (*Client, error) {
+	return NewClientWithModeAndAPIKey(managed, "")
 }
 
 // NewClientWithModeAndAPIKey creates a new Tendrl client with the specified mode and API key
@@ -66,6 +89,7 @@ func NewClientWithModeAndAPIKey(managed bool, apiKey string) (*Client, error) {
 		checkMsgRate:  3 * time.Second, // Default: check every 3 seconds
 		checkMsgLimit: 1,               // Default: get 1 message per check
 		lastMsgCheck:  time.Now(),
+		lastHeartbeat: time.Now(), // Initialize heartbeat timer
 	}
 
 	// Initialize managed mode components only if needed
@@ -141,6 +165,9 @@ func NewClientWithModeAndAPIKey(managed bool, apiKey string) (*Client, error) {
 
 		// Start message checking if callback is set
 		client.startMessageChecking()
+
+		// Update entity status to online
+		client.updateEntityStatus(true)
 	}
 
 	return client, nil
@@ -164,6 +191,7 @@ func NewClientWithConfigAndAPIKey(configPath string, apiKey string) (*Client, er
 		checkMsgRate:  3 * time.Second, // Default: check every 3 seconds
 		checkMsgLimit: 1,               // Default: get 1 message per check
 		lastMsgCheck:  time.Now(),
+		lastHeartbeat: time.Now(), // Initialize heartbeat timer
 	}
 
 	// Initialize managed mode components only if needed
@@ -239,6 +267,9 @@ func NewClientWithConfigAndAPIKey(configPath string, apiKey string) (*Client, er
 
 		// Start message checking if callback is set
 		client.startMessageChecking()
+
+		// Update entity status to online
+		client.updateEntityStatus(true)
 	}
 
 	return client, nil
@@ -256,12 +287,15 @@ func (c *Client) setupAPIConfig() error {
 
 	// Set base URL (hardcoded for Tendrl service)
 	c.baseURL = "https://app.tendrl.com/api"
+	c.debugLog("API base URL: %s", c.baseURL)
 
 	// Validate API key in managed mode
 	if c.config.Managed {
+		c.debugLog("Validating API key")
 		if err := c.validateAPIKey(); err != nil {
 			return fmt.Errorf("API key validation failed: %w", err)
 		}
+		c.debugLog("API key validated successfully")
 	}
 
 	return nil
@@ -359,6 +393,13 @@ func (c *Client) GetConnectivityState() ConnectivityState {
 }
 
 func (c *Client) Stop() {
+	c.debugLog("TendrlClient stopping")
+
+	// Update entity status to offline
+	if c.config.Managed {
+		c.updateEntityStatus(false)
+	}
+
 	if c.config.Managed {
 		if c.done != nil {
 			close(c.done)
@@ -367,6 +408,55 @@ func (c *Client) Stop() {
 			c.storage.Close()
 		}
 		c.wg.Wait()
+	}
+	c.debugLog("TendrlClient stopped")
+}
+
+// updateEntityStatus updates the entity's online/offline status on the backend
+// This is called automatically on client start (online=true) and stop (online=false)
+func (c *Client) updateEntityStatus(online bool) {
+	endpoint, err := url.JoinPath(c.baseURL, "/entities/status")
+	if err != nil {
+		c.debugLog("Failed to construct status endpoint URL: %v", err)
+		return
+	}
+
+	// Create request body
+	requestBody := map[string]bool{"online": online}
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		c.debugLog("Failed to marshal status request: %v", err)
+		return
+	}
+
+	req, err := http.NewRequest("PUT", endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		c.debugLog("Failed to create status update request: %v", err)
+		return
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("User-Agent", BuildUserAgent())
+
+	// Execute request with a short timeout
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.debugLog("Error updating entity status: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		status := "offline"
+		if online {
+			status = "online"
+		}
+		c.debugLog("Entity status updated to %s", status)
+	} else {
+		c.debugLog("Failed to update entity status: %d %s", resp.StatusCode, resp.Status)
 	}
 }
 

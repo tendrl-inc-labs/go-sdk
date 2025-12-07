@@ -1,7 +1,7 @@
 # Tendrl Go SDK
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/tendrl-inc/clients/tendrl_go_sdk)
-[![Go Version](https://img.shields.io/badge/go-1.16+-00ADD8.svg)](https://golang.org/doc/devel/release.html)
+[![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/doc/devel/release.html)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
 A simple, flexible SDK for high-performance messaging.
@@ -27,13 +27,14 @@ For licensing questions, contact: `support@tendrl.com`
 
 ## Features
 
-- 🐍 **Flexibility**: Works with any JSON-serializable type - strings, maps (any key/value types), structs, arrays, primitives - no complex formatting
-- 💾 **Offline Message Storage**: BoltDB-based persistence with TTL
-- 🔄 **Automatic Retry**: Background retry process for offline messages
-- 🎯 **Resource Monitoring**: Automatic system resource adaptation
-- 📈 **Dynamic Batch Processing**: CPU/memory-aware batching (10-500 messages)
-- 🧵 **Thread-Safe Operations**: Concurrent-safe message handling
-- 🎯 **Consolidated API**: Single `Publish()` method handles all use cases
+- **Flexibility**: Works with any JSON-serializable type - strings (automatically wrapped), maps (any key/value types), structs, arrays, primitives - no complex formatting
+- **Offline Message Storage**: BoltDB-based persistence with TTL
+- **Automatic Retry**: Background retry process for offline messages
+- **Automatic Heartbeats**: System resource monitoring with automatic heartbeat messages (managed mode)
+- **Resource Monitoring**: Automatic system resource adaptation
+- **Dynamic Batch Processing**: CPU/memory-aware batching (10-500 messages)
+- **Thread-Safe Operations**: Concurrent-safe message handling
+- **Consolidated API**: Single `Publish()` method handles all use cases
 
 **Benefits:**
 
@@ -68,8 +69,14 @@ For programmatic use, you can pass the API key directly:
 // Managed mode with API key parameter (recommended)
 client, err := tendrl.NewClient(true, "your_api_key_here")
 
+// Managed mode using environment variable (apiKey is optional)
+client, err := tendrl.NewClient(true)
+
 // Direct API mode with API key parameter  
 client, err := tendrl.NewClient(false, "your_api_key_here")
+
+// Direct API mode using environment variable
+client, err := tendrl.NewClient(false)
 ```
 
 ### 3. Configuration Priority
@@ -84,21 +91,116 @@ client, err := tendrl.NewClient(false, "your_api_key_here")
 - `true` = Managed mode (full features: queuing, batching, offline storage) - **Recommended**
 - `false` = Direct API mode (immediate API calls only)
 
+### 4. Configuration File
+
+You can also configure the client using a JSON configuration file. The SDK will automatically look for a config file at `~/.tendrl/config.json` or you can specify a custom path.
+
+```json
+{
+  "managed": true,
+  "timeout_seconds": 10,
+  "max_retries": 3,
+  "debug": false,
+  "send_heartbeat": true,
+  "heartbeat_interval_seconds": 30,
+  "offline_storage": true,
+  "storage_path": "tendrl_storage.db"
+}
+```
+
+To generate an example configuration file:
+
+```go
+import "github.com/tendrl-inc-labs/go-sdk/tendrl"
+
+// Generate example config at default location
+err := tendrl.InitializeConfig(tendrl.GetDefaultConfigPath())
+```
+
+## Debug Mode
+
+The Go SDK includes a debug mode that provides detailed logging of SDK operations. This is useful for troubleshooting, development, and understanding SDK behavior.
+
+### Enabling Debug Mode
+
+Debug mode can be enabled in several ways:
+
+**1. Configuration File:**
+
+```json
+{
+  "debug": true
+}
+```
+
+**2. Programmatic Configuration:**
+
+When loading a config file, set `debug: true` in the JSON configuration.
+
+### What Gets Logged
+
+When debug mode is enabled, the SDK logs:
+
+- **Client Initialization**: SDK startup, configuration loading, API key validation
+- **Message Publishing**: All publish operations with details (tags, destination, wait response)
+- **API Requests**: HTTP endpoints being called, request/response status
+- **Message Callbacks**: Incoming messages received and processed
+- **Queue Processing**: Batch operations, queue status
+- **Connectivity**: Network state changes (online/offline transitions)
+- **Heartbeats**: Automatic heartbeat sending with system resource data
+- **Offline Storage**: Message storage and retry operations
+
+### Example Debug Output
+
+```bash
+[DEBUG] TendrlClient initialized (managed=true, debug=true)
+[DEBUG] API base URL: https://app.tendrl.com/api
+[DEBUG] Validating API key
+[DEBUG] API key validated successfully
+[DEBUG] Initializing offline storage: tendrl_storage.db
+[DEBUG] Publishing message (tags=[sensor temperature], entity=, waitResponse=false)
+[DEBUG] Sending 1 message(s) (waitResponse=false)
+[DEBUG] Sending request to: https://app.tendrl.com/api/entities/messages
+[DEBUG] Message(s) sent successfully (status=200)
+[DEBUG] Checking for incoming messages (limit=1)
+[DEBUG] Received 2 message(s)
+[DEBUG] Processing message: type=cmd, source=123:us-1:entity:sender
+[DEBUG] Sending heartbeat
+[DEBUG] Heartbeat data: mem_free=8589934592, mem_total=17179869184, disk_free=536870912000, disk_size=1073741824000
+[DEBUG] Connectivity changed: online -> offline
+[DEBUG] Connectivity changed: offline -> online
+[DEBUG] TendrlClient stopping
+[DEBUG] TendrlClient stopped
+```
+
+### Disabling Debug Mode
+
+Debug mode is disabled by default. To disable it explicitly:
+
+```json
+{
+  "debug": false
+}
+```
+
+**Note**: Debug logging uses Go's standard `log` package and outputs to `stderr`. In production environments, you may want to redirect or filter debug output.
+
 ## Operating Modes
 
 The Go SDK supports two operating modes:
 
-### 🚀 Managed Mode (Default & Recommended)
+### Managed Mode (Default & Recommended)
 
 #### Full-featured with automatic background processing
 
-- ✅ **Automatic** API key validation on startup
-- ✅ **Automatic** message queuing and dynamic batching
-- ✅ **Automatic** offline storage with retry
-- ✅ **Automatic** background system monitoring
-- ✅ **Automatic** resource-aware batch optimization
+- **Automatic** API key validation on startup
+- **Automatic** message queuing and dynamic batching
+- **Automatic** offline storage with retry
+- **Automatic** heartbeat messages with system resource information
+- **Automatic** background system monitoring
+- **Automatic** resource-aware batch optimization
 
-### ⚡ Direct API Mode
+### Direct API Mode
 
 #### Lightweight immediate API calls
 
@@ -124,7 +226,7 @@ import (
 
 func main() {
     // Create managed client (reads TENDRL_KEY environment variable)
-    client, err := tendrl.NewClient(true, "") // true = managed mode, "" = use env var
+    client, err := tendrl.NewClient(true) // true = managed mode, apiKey optional - uses TENDRL_KEY env var
     if err != nil {
         log.Fatal(err)
     }
@@ -173,6 +275,42 @@ err := client.PublishAsync(data, []string{"tag1", "tag2"})
 
 // All publishing goes through the main Publish method
 // which handles both sync and async cases automatically
+```
+
+### Helper Methods
+
+The SDK provides convenience methods for common use cases:
+
+```go
+// Publish heartbeat with system resource information (manual)
+heartbeatData := tendrl.HeartbeatData{
+    MemFree:  15728640,   // Available RAM in bytes
+    MemTotal: 8388608,    // Total RAM in bytes
+    DiskFree: 536870912,  // Available filesystem space in bytes
+    DiskSize: 1073741824, // Total filesystem size in bytes
+}
+err := client.PublishHeartbeat(heartbeatData)
+
+// Automatic heartbeats are enabled by default in managed mode
+// They send system resource information every 30 seconds automatically
+// To disable: configure client with SendHeartbeat: false
+// To customize interval: set HeartbeatInterval in config
+
+// Publish sensor data (convenience method)
+sensorData := map[string]interface{}{
+    "temperature": 23.5,
+    "humidity": 60.2,
+    "pressure": 1013.25,
+}
+err := client.PublishSensorData(sensorData, []string{"sensor", "environment"})
+
+// Cross-account messaging (send to another entity)
+destination := "123:us-1:entity:target-entity"
+err := client.PublishCrossAccount(
+    map[string]interface{}{"command": "restart"},
+    destination,
+    []string{"urgent", "command"},
+)
 ```
 
 ### Message Callbacks
@@ -259,8 +397,9 @@ defer stopAppMetrics()
 The SDK works with any JSON-serializable data type:
 
 ```go
-// Strings stay as strings
+// Strings are automatically wrapped in {"data": "..."} to match backend expectations
 client.Publish("Simple log message", []string{"logs"})
+// This sends: {"msg_type": "publish", "data": {"data": "Simple log message"}, ...}
 
 // Any map type works (not just map[string]interface{})
 client.Publish(map[string]interface{}{
@@ -355,12 +494,58 @@ fmt.Printf("Online: %v, Last Check: %v\n",
     connectivity.Online, connectivity.LastCheck.Format("15:04:05"))
 ```
 
+## Automatic Heartbeats
+
+In managed mode, the SDK automatically sends heartbeat messages with system resource information:
+
+```go
+// Automatic heartbeats are enabled by default in managed mode
+// They send every 30 seconds with real system metrics:
+// - Memory: Available and total RAM
+// - Disk: Available and total filesystem space
+
+// To disable automatic heartbeats:
+client, err := tendrl.NewClientWithConfigAndAPIKey("config.json", "api_key")
+// In config.json: set "send_heartbeat": false
+
+// To customize heartbeat interval (default: 30 seconds):
+// In config.json: set "heartbeat_interval_seconds": 60
+```
+
+**Heartbeat Features:**
+
+- Automatically enabled in managed mode
+- Uses real system metrics (memory and disk)
+- Sends every 30 seconds by default
+- Configurable interval
+- Disabled in headless mode
+- Gracefully handles errors (won't break client if heartbeat fails)
+
 ## Offline Storage & Retry
+
+The SDK automatically stores messages in BoltDB when the network is unavailable and retries sending them when connectivity is restored.
+
+### Message TTL (Time To Live)
+
+**All offline messages have a TTL of 1 hour (3600 seconds).**
+
+- Messages stored offline are automatically assigned a 1-hour expiration time
+- Expired messages are automatically cleaned up and will not be retried
+- TTL cleanup happens:
+  - Periodically during queue processing
+  - During retry operations (expired messages are skipped and deleted)
+- This prevents indefinite storage of old messages that may no longer be relevant
+
+**TTL Behavior:**
+
+- Messages stored when offline: TTL starts from storage timestamp
+- If a message expires before it can be sent, it's automatically deleted
+- No manual cleanup required - the SDK handles expiration automatically
 
 **Offline Retry Flow:**
 
 ```sh
-Network Down → Store Messages in BoltDB
+Network Down → Store Messages in BoltDB (with 1-hour TTL)
                         ↓
             Background Retry Process (every 15-30s)
                         ↓
@@ -368,6 +553,8 @@ Network Down → Store Messages in BoltDB
                         ↓ Yes
                 Retrieve Stored Messages
                         ↓
+            Check TTL ──Expired──→ Delete & Skip
+                        ↓ Valid
                   Send in Batches
                         ↓
                    Success? ──No──→ Keep for Next Retry
@@ -384,8 +571,6 @@ The SDK supports environment variables for configuration:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `TENDRL_KEY` | API key for authentication | "" |
-| `TENDRL_STORAGE_PATH` | Custom path for offline storage | "./tendrl_storage.db" |
-| `TENDRL_DEBUG` | Enable debug logging | false |
 
 **API Key Priority:**
 
@@ -397,10 +582,9 @@ The SDK supports environment variables for configuration:
 ```bash
 # Traditional environment variable method
 export TENDRL_KEY="your_api_key_here"
-
-# Custom storage path
-export TENDRL_STORAGE_PATH="/custom/path/storage.db"
 ```
+
+**Note:** For storage path and debug settings, use the config file instead of environment variables. See [Configuration File](#4-configuration-file) section.
 
 ## Error Handling
 
@@ -424,10 +608,10 @@ for attempts := 0; attempts < 3; attempts++ {
 ```go
 // ✅ Good: Use environment variables or parameters for API keys
 export TENDRL_KEY=your_api_key_here
-client, _ := tendrl.NewClient()  // Reads TENDRL_KEY automatically
+client, _ := tendrl.NewClient(true)  // Reads TENDRL_KEY automatically
 
 // ✅ Good: Pass API key as parameter
-client, _ := tendrl.NewClientWithAPIKey("your_api_key_here")
+client, _ := tendrl.NewClient(true, "your_api_key_here")
 
 // ❌ Avoid: API keys are NOT stored in config files for security
 // Config files only contain non-sensitive settings
@@ -435,7 +619,7 @@ client, _ := tendrl.NewClientWithAPIKey("your_api_key_here")
 
 ## Compatibility
 
-- Go 1.16+
+- Go 1.21+
 - All major operating systems (Linux, macOS, Windows)
 - Both amd64 and arm64 architectures
 

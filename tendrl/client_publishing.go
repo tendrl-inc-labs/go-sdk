@@ -9,15 +9,19 @@ import (
 	"time"
 )
 
-// prepareData formats data appropriately - strings stay as strings, everything else gets JSON marshaled
+// prepareData formats data appropriately - matches Python SDK behavior
+// Backend expects data to be a dict/object, not a string
+// Wrap string data in a map to match backend expectations (similar to Python SDK's make_message)
 func (c *Client) prepareData(data interface{}) (interface{}, error) {
 	if data == nil {
 		return nil, nil
 	}
 
-	// If it's already a string, use it directly
+	// If it's already a string, wrap it in a map like Python SDK does
 	if str, ok := data.(string); ok {
-		return str, nil
+		return map[string]interface{}{
+			"data": str,
+		}, nil
 	}
 
 	// For all other types, return as-is and let JSON marshal handle it
@@ -40,20 +44,29 @@ func (c *Client) dataAsString(data interface{}) (string, error) {
 
 // Publish sends a message with optional response waiting (matches Python SDK API)
 func (c *Client) Publish(data interface{}, tags []string, entity string, waitResponse bool, timeout int) (string, error) {
+	c.debugLog("Publishing message (tags=%v, entity=%s, waitResponse=%v)", tags, entity, waitResponse)
 	// Prepare data for message format
 	preparedData, err := c.prepareData(data)
 	if err != nil {
 		return "", fmt.Errorf("failed to prepare data: %w", err)
 	}
 
-	msg := Message{
-		Data: preparedData,
-		Context: MessageContext{
+	// Create context only if tags or wait_response are set
+	var context *MessageContext
+	if len(tags) > 0 || waitResponse {
+		context = &MessageContext{
 			Tags:         tags,
-			Entity:       entity,
 			WaitResponse: waitResponse,
 			Timeout:      timeout,
-		},
+		}
+	}
+
+	msg := Message{
+		MsgType:     "publish", // Default message type
+		Data:        preparedData,
+		Context:     context,
+		Destination: entity, // Use dest field for cross-account messaging
+		Timestamp:   time.Now().UTC().Format(time.RFC3339Nano),
 	}
 
 	// In headless mode or when wait_response=true, send immediately
@@ -101,6 +114,7 @@ func (c *Client) Publish(data interface{}, tags []string, entity string, waitRes
 
 // PublishAsync sends a message asynchronously (fire-and-forget)
 func (c *Client) PublishAsync(data interface{}, tags []string) error {
+	c.debugLog("Publishing message asynchronously (tags=%v)", tags)
 	_, err := c.Publish(data, tags, "", false, 5)
 	return err
 }
@@ -110,6 +124,8 @@ func (c *Client) sendMessages(messages []Message, waitResponse bool) (string, er
 	if len(messages) == 0 {
 		return "", nil
 	}
+
+	c.debugLog("Sending %d message(s) (waitResponse=%v)", len(messages), waitResponse)
 
 	// Determine payload format based on count and wait_response
 	var jsonData []byte
@@ -130,15 +146,16 @@ func (c *Client) sendMessages(messages []Message, waitResponse bool) (string, er
 	// Create HTTP request - use different endpoints for single vs batch
 	var endpoint string
 	if len(messages) == 1 && waitResponse {
-		// Single message with response uses /message endpoint
-		endpoint, err = url.JoinPath(c.baseURL, "/message")
+		// Single message with response uses /entities/message endpoint
+		endpoint, err = url.JoinPath(c.baseURL, "/entities/message")
 	} else {
-		// Batch messages use /messages endpoint
-		endpoint, err = url.JoinPath(c.baseURL, "/messages")
+		// Batch messages use /entities/messages endpoint
+		endpoint, err = url.JoinPath(c.baseURL, "/entities/messages")
 	}
 	if err != nil {
 		return "", fmt.Errorf("failed to construct endpoint URL: %w", err)
 	}
+	c.debugLog("Sending request to: %s", endpoint)
 
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -170,6 +187,7 @@ func (c *Client) sendMessages(messages []Message, waitResponse bool) (string, er
 
 		// Check for success status codes
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			c.debugLog("Message(s) sent successfully (status=%d)", resp.StatusCode)
 			// Success - we're online
 			if c.config.Managed && c.connectivity != nil {
 				c.updateConnectivityState(true)

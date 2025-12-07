@@ -41,6 +41,13 @@ type ConfigFile struct {
 	// Connectivity monitoring settings
 	ConnectivityCheckEnabled  bool `json:"connectivity_check_enabled,omitempty"`
 	ConnectivityCheckInterval int  `json:"connectivity_check_interval_seconds,omitempty"`
+
+	// Heartbeat settings
+	SendHeartbeat     *bool `json:"send_heartbeat,omitempty"`             // Enable automatic heartbeat messages (nil = use default true)
+	HeartbeatInterval int   `json:"heartbeat_interval_seconds,omitempty"` // Interval between heartbeats in seconds
+
+	// Debug settings
+	Debug bool `json:"debug,omitempty"` // Enable debug logging
 }
 
 // LoadConfigFile loads configuration from a JSON file
@@ -119,7 +126,8 @@ func GetDefaultConfigPath() string {
 
 // GenerateExampleConfig creates an example configuration file with all options
 func GenerateExampleConfig() *ConfigFile {
-	return &ConfigFile{
+	sendHeartbeat := true
+	config := &ConfigFile{
 		// HTTP settings
 		Timeout:    10,
 		MaxRetries: 3,
@@ -150,7 +158,15 @@ func GenerateExampleConfig() *ConfigFile {
 		// Connectivity monitoring settings
 		ConnectivityCheckEnabled:  true,
 		ConnectivityCheckInterval: 30,
+
+		// Heartbeat settings
+		SendHeartbeat:     &sendHeartbeat,
+		HeartbeatInterval: 30,
+
+		// Debug settings
+		Debug: false,
 	}
+	return config
 }
 
 // toConfig converts ConfigFile to internal Config struct
@@ -178,6 +194,13 @@ func (cf *ConfigFile) toConfig() *Config {
 		// Connectivity monitoring defaults
 		ConnectivityCheckEnabled:  true,
 		ConnectivityCheckInterval: 30 * time.Second,
+
+		// Heartbeat defaults
+		SendHeartbeat:     true,             // Enable by default in managed mode
+		HeartbeatInterval: 30 * time.Second, // Send heartbeat every 30 seconds
+
+		// Debug defaults
+		Debug: false, // Disable debug logging by default
 	}
 
 	// Override with values from config file (if specified)
@@ -220,18 +243,28 @@ func (cf *ConfigFile) toConfig() *Config {
 	if cf.ConnectivityCheckInterval > 0 {
 		config.ConnectivityCheckInterval = time.Duration(cf.ConnectivityCheckInterval) * time.Second
 	}
+	if cf.HeartbeatInterval > 0 {
+		config.HeartbeatInterval = time.Duration(cf.HeartbeatInterval) * time.Second
+	}
 
-	// Boolean fields (explicitly set if specified)
+	// Boolean fields - use config file values
 	config.Managed = cf.Managed
 	config.OfflineStorage = cf.OfflineStorage
 	config.OfflineRetryEnabled = cf.OfflineRetryEnabled
 	config.ConnectivityCheckEnabled = cf.ConnectivityCheckEnabled
+	config.Debug = cf.Debug
+	// SendHeartbeat: Use pointer to distinguish "not set" (nil = use default true) from "explicitly false"
+	if cf.SendHeartbeat != nil {
+		config.SendHeartbeat = *cf.SendHeartbeat
+	}
+	// Otherwise, keep the default (true) that was set above
 
 	// Disable managed-mode features if in headless mode
 	if !config.Managed {
 		config.OfflineStorage = false
 		config.OfflineRetryEnabled = false
 		config.ConnectivityCheckEnabled = false
+		config.SendHeartbeat = false // Disable heartbeat in headless mode
 	}
 
 	return config

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	tendrl "github.com/tendrl-inc/clients/tendrl_sdk/tendrl"
+	tendrl "github.com/tendrl-inc-labs/go-sdk/tendrl"
 )
 
 func userSignupMetrics() (interface{}, error) {
@@ -76,7 +76,7 @@ func main() {
 
 	// Create managed client with full features
 	fmt.Println("Creating managed client (with queuing/batching)...")
-	client, err := tendrl.NewClient(true, "") // true = managed mode, "" = use env var
+	client, err := tendrl.NewClient(true) // true = managed mode, apiKey optional - uses TENDRL_KEY env var
 
 	if err != nil {
 		log.Fatal(err)
