@@ -1,6 +1,6 @@
 # Tendrl Go SDK
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/tendrl-inc/clients/tendrl_go_sdk)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/tendrl-inc-labs/go-sdk)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/doc/devel/release.html)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
@@ -313,29 +313,56 @@ err := client.PublishCrossAccount(
 )
 ```
 
-### Message Callbacks
+### Inbound Message Routing
+
+Route incoming messages with `client.On()`:
 
 ```go
-// Set up callback to handle incoming messages (managed mode only for auto-checking)
-client.SetMessageCallback(func(message tendrl.IncomingMessage) error {
-    // Process incoming message
-    fmt.Printf("Received: %s from %s\n", message.MsgType, message.Source)
-    return nil // Return error if processing fails
+client.On(tendrl.MessageRoute{
+    Tag: "ai-response",
+    Handler: func(message tendrl.IncomingMessage) error {
+        fmt.Printf("AI: %v\n", message.Data)
+        return nil
+    },
 })
 
-// Configure checking behavior (optional)
-client.SetMessageCheckRate(5 * time.Second)  // Check every 5 seconds (default: 3)
-client.SetMessageCheckLimit(10)              // Max messages per check (default: 1)
+client.On(tendrl.MessageRoute{
+    Tags: []string{"alert", "anomaly"},
+    Handler: func(message tendrl.IncomingMessage) error {
+        fmt.Printf("Alert: %v\n", message.Data)
+        return nil
+    },
+})
 
-// Manual message check (works in any mode)
-err := client.CheckMessages()
+client.OnDefault(func(message tendrl.IncomingMessage) error {
+    fmt.Printf("Unhandled: %s\n", message.MsgType)
+    return nil
+})
+
+client.SetMessageCheckRate(5 * time.Second)
+client.SetMessageCheckLimit(10)
 ```
+
+`SetMessageCallback` remains available as a catch-all fallback for unmatched messages.
+
+### Inbound state (`OnState`)
+
+Poll `GET /entities/status-table` at the same interval as messages. The handler fires when the table changes (not on the first poll):
+
+```go
+client.OnState(func(state map[string]interface{}) error {
+    fmt.Println("State:", state)
+    return nil
+})
+```
+
+`SetStateCallback` remains available as a catch-all fallback.
 
 ### IncomingMessage Structure
 
 | Field | Type | Description | Required |
 |-------|------|-------------|----------|
-| `msg_type` | `string` | Message type identifier (e.g., "command", "notification", "alert") | ✅ Yes |
+| `msg_type` | `string` | Message type identifier (e.g., "publish", "notification", "alert") | ✅ Yes |
 | `source` | `string` | Sender's resource path (set by server) | ✅ Yes |
 | `dest` | `string` | Destination entity identifier | ❌ Optional |
 | `timestamp` | `string` | RFC3339 timestamp (set by server) | ✅ Yes |
@@ -354,9 +381,9 @@ err := client.CheckMessages()
 
 1. **Background Checking**: In managed mode, the SDK automatically checks for messages every 3 seconds (configurable)
 2. **Manual Checking**: You can call `CheckMessages()` manually in any mode
-3. **Callback Execution**: Your callback function is called for each incoming message
-4. **Error Handling**: Failed callbacks don't stop other message processing
-5. **Connectivity Aware**: Automatically handles network failures and updates connectivity state
+3. **Route Matching**: Registered `On()` routes are checked in registration order; first match wins
+4. **Fallback**: Unmatched messages go to `OnDefault`, then `SetMessageCallback`, if set
+5. **Error Handling**: Failed handlers don't stop other message processing
 
 ### Tethering Functions to the Cloud
 

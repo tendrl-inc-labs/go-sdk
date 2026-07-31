@@ -25,8 +25,8 @@ func (c *Client) SetMessageCheckLimit(limit int) {
 
 // CheckMessages manually checks for incoming messages and calls the callback if set
 func (c *Client) CheckMessages() error {
-	if c.callback == nil {
-		return nil // No callback set, nothing to do
+	if !c.hasMessageHandlers() {
+		return nil
 	}
 	c.debugLog("Checking for incoming messages (limit=%d)", c.checkMsgLimit)
 
@@ -84,7 +84,7 @@ func (c *Client) CheckMessages() error {
 		c.debugLog("Received %d message(s)", len(response.Messages))
 		for _, message := range response.Messages {
 			c.debugLog("Processing message: type=%s, source=%s", message.MsgType, message.Source)
-			if err := c.callback(message); err != nil {
+			if err := c.dispatchMessage(message); err != nil {
 				c.debugLog("Callback error for message: %v", err)
 				// Continue processing other messages even if one callback fails
 				// You might want to log this error depending on your needs
@@ -100,7 +100,7 @@ func (c *Client) CheckMessages() error {
 
 // startMessageChecking starts a goroutine to periodically check for messages (only in managed mode)
 func (c *Client) startMessageChecking() {
-	if !c.config.Managed || c.callback == nil {
+	if !c.config.Managed || !c.hasInboundHandlers() {
 		return
 	}
 
@@ -114,7 +114,12 @@ func (c *Client) startMessageChecking() {
 			select {
 			case <-ticker.C:
 				if time.Since(c.lastMsgCheck) >= c.checkMsgRate {
-					c.CheckMessages() // Ignore errors for background checking
+					if c.hasMessageHandlers() {
+						c.CheckMessages()
+					}
+					if c.hasStateHandlers() {
+						c.CheckState()
+					}
 					c.lastMsgCheck = time.Now()
 				}
 

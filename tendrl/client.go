@@ -36,8 +36,14 @@ type Client struct {
 	done         chan struct{}
 
 	// Message callback functionality
-	callback      MessageCallback
-	checkMsgRate  time.Duration // How often to check for messages
+	callback       MessageCallback
+	defaultHandler MessageCallback
+	routes         []MessageRoute
+	stateHandler   StateCallback
+	stateCallback  StateCallback
+	lastState      map[string]interface{}
+	lastStateInit  bool
+	checkMsgRate   time.Duration // How often to check for messages
 	checkMsgLimit int           // Maximum number of messages to retrieve per check
 	lastMsgCheck  time.Time     // Last time messages were checked
 
