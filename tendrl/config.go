@@ -16,7 +16,10 @@ type ConfigFile struct {
 	MaxRetries int `json:"max_retries,omitempty"`
 
 	// Mode settings
-	Managed bool `json:"managed,omitempty"`
+	// Pointer so an omitted "managed" (nil) keeps the default (true) instead of
+	// a zero-value false disabling managed-mode features in toConfig before the
+	// caller can override. NewClient still sets Managed authoritatively after.
+	Managed *bool `json:"managed,omitempty"`
 
 	// Batch processing settings
 	MinBatchSize     int     `json:"min_batch_size,omitempty"`
@@ -29,18 +32,20 @@ type ConfigFile struct {
 	MinBatchIntervalMs int `json:"min_batch_interval_ms,omitempty"`
 	MaxBatchIntervalMs int `json:"max_batch_interval_ms,omitempty"`
 
-	// Storage settings
-	OfflineStorage bool   `json:"offline_storage,omitempty"`
+	// Storage settings. Pointer so an absent config file (nil) keeps the
+	// managed-mode default (true) instead of a zero-value false silently
+	// disabling offline storage — same pattern as SendHeartbeat below.
+	OfflineStorage *bool  `json:"offline_storage,omitempty"`
 	StoragePath    string `json:"storage_path,omitempty"`
 
-	// Offline retry settings
-	OfflineRetryEnabled  bool `json:"offline_retry_enabled,omitempty"`
-	OfflineRetryInterval int  `json:"offline_retry_interval_seconds,omitempty"`
-	OfflineRetryLimit    int  `json:"offline_retry_limit,omitempty"`
+	// Offline retry settings (pointer: nil = use default true)
+	OfflineRetryEnabled  *bool `json:"offline_retry_enabled,omitempty"`
+	OfflineRetryInterval int   `json:"offline_retry_interval_seconds,omitempty"`
+	OfflineRetryLimit    int   `json:"offline_retry_limit,omitempty"`
 
-	// Connectivity monitoring settings
-	ConnectivityCheckEnabled  bool `json:"connectivity_check_enabled,omitempty"`
-	ConnectivityCheckInterval int  `json:"connectivity_check_interval_seconds,omitempty"`
+	// Connectivity monitoring settings (pointer: nil = use default true)
+	ConnectivityCheckEnabled  *bool `json:"connectivity_check_enabled,omitempty"`
+	ConnectivityCheckInterval int   `json:"connectivity_check_interval_seconds,omitempty"`
 
 	// Heartbeat settings
 	SendHeartbeat     *bool `json:"send_heartbeat,omitempty"`             // Enable automatic heartbeat messages (nil = use default true)
@@ -127,13 +132,17 @@ func GetDefaultConfigPath() string {
 // GenerateExampleConfig creates an example configuration file with all options
 func GenerateExampleConfig() *ConfigFile {
 	sendHeartbeat := true
+	offlineStorage := true
+	offlineRetry := true
+	connectivityCheck := true
+	managed := true
 	config := &ConfigFile{
 		// HTTP settings
 		Timeout:    10,
 		MaxRetries: 3,
 
 		// Mode settings
-		Managed: true,
+		Managed: &managed,
 
 		// Batch processing settings
 		MinBatchSize:     10,
@@ -147,16 +156,16 @@ func GenerateExampleConfig() *ConfigFile {
 		MaxBatchIntervalMs: 1000,
 
 		// Storage settings
-		OfflineStorage: true,
+		OfflineStorage: &offlineStorage,
 		StoragePath:    "tendrl_storage.db",
 
 		// Offline retry settings
-		OfflineRetryEnabled:  true,
+		OfflineRetryEnabled:  &offlineRetry,
 		OfflineRetryInterval: 30,
 		OfflineRetryLimit:    5,
 
 		// Connectivity monitoring settings
-		ConnectivityCheckEnabled:  true,
+		ConnectivityCheckEnabled:  &connectivityCheck,
 		ConnectivityCheckInterval: 30,
 
 		// Heartbeat settings
@@ -247,11 +256,23 @@ func (cf *ConfigFile) toConfig() *Config {
 		config.HeartbeatInterval = time.Duration(cf.HeartbeatInterval) * time.Second
 	}
 
-	// Boolean fields - use config file values
-	config.Managed = cf.Managed
-	config.OfflineStorage = cf.OfflineStorage
-	config.OfflineRetryEnabled = cf.OfflineRetryEnabled
-	config.ConnectivityCheckEnabled = cf.ConnectivityCheckEnabled
+	// Boolean fields - override the defaults above only when the config file
+	// actually specifies them. A plain bool here would let a zero-value false
+	// (no config file / field omitted) silently disable managed-mode features
+	// that default to true — which is exactly what turned off offline storage,
+	// offline retry, and connectivity monitoring on the default NewClient path.
+	if cf.Managed != nil {
+		config.Managed = *cf.Managed
+	}
+	if cf.OfflineStorage != nil {
+		config.OfflineStorage = *cf.OfflineStorage
+	}
+	if cf.OfflineRetryEnabled != nil {
+		config.OfflineRetryEnabled = *cf.OfflineRetryEnabled
+	}
+	if cf.ConnectivityCheckEnabled != nil {
+		config.ConnectivityCheckEnabled = *cf.ConnectivityCheckEnabled
+	}
 	config.Debug = cf.Debug
 	// SendHeartbeat: Use pointer to distinguish "not set" (nil = use default true) from "explicitly false"
 	if cf.SendHeartbeat != nil {

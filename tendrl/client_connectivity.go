@@ -61,9 +61,13 @@ func (c *Client) checkConnectivity() {
 	}
 	defer resp.Body.Close()
 
-	// Consider 2xx and 3xx as "online", anything else as potentially offline
-	isOnline := resp.StatusCode >= 200 && resp.StatusCode < 400
-	c.updateConnectivityState(isOnline)
+	// ANY HTTP response proves we reached the server — that is what
+	// "connectivity" means here, not authorization or a specific route
+	// existing. Requiring 2xx/3xx meant a 404 (e.g. this build has no
+	// /api/health) or a 401 pinned IsOnline() to false forever, which silently
+	// disabled the offline-retry drain even with the server fully reachable.
+	// Only a transport error (handled above) counts as offline.
+	c.updateConnectivityState(true)
 }
 
 // updateConnectivityState updates the connectivity state thread-safely

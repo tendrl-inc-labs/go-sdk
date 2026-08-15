@@ -3,10 +3,23 @@ package tendrl
 import (
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
 )
+
+// storeSeq guarantees unique offline-storage keys. The previous key was
+// time.Now().Format(time.RFC3339) — SECOND resolution — so every message
+// buffered within the same second Put()'s over the previous one in BoltDB and
+// is lost. A burst of N messages during an outage kept only 1. UnixNano plus a
+// monotonic counter can never collide.
+var storeSeq uint64
+
+// NextStorageKey returns a collision-proof key for an offline-stored message.
+func NextStorageKey() string {
+	return fmt.Sprintf("%019d-%06d", time.Now().UnixNano(), atomic.AddUint64(&storeSeq, 1))
+}
 
 // Storage handles persistent message storage using BoltDB
 type Storage struct {

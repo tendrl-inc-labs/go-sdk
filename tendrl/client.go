@@ -3,6 +3,7 @@ package tendrl
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -291,21 +292,47 @@ func (c *Client) setupAPIConfig() error {
 		}
 	}
 
-	// Set base URL (hardcoded for Tendrl service)
-	c.baseURL = "https://app.tendrl.com/api"
+	// Base URL: TENDRL_APP_URL env or production. Accepts either a bare origin
+	// ("http://192.168.1.50" — the SDK appends /api) or a full base URL already
+	// ending in /api (nano-agent style), so the same env var works everywhere.
+	if envURL := os.Getenv("TENDRL_APP_URL"); envURL != "" {
+		trimmed := envURL
+		for len(trimmed) > 0 && trimmed[len(trimmed)-1] == '/' {
+			trimmed = trimmed[:len(trimmed)-1]
+		}
+		if len(trimmed) < 4 || trimmed[len(trimmed)-4:] != "/api" {
+			trimmed += "/api"
+		}
+		c.baseURL = trimmed
+	} else {
+		c.baseURL = "https://app.tendrl.com/api"
+	}
 	c.debugLog("API base URL: %s", c.baseURL)
 
-	// Validate API key in managed mode
+	// Validate API key in managed mode. A REJECTED key (401/403) is fatal —
+	// but an UNREACHABLE server must not be: a device that boots during an
+	// outage still has to start, buffer offline, and deliver when connectivity
+	// returns (that is the whole point of offline storage). The key gets
+	// validated implicitly on the first successful request.
 	if c.config.Managed {
 		c.debugLog("Validating API key")
 		if err := c.validateAPIKey(); err != nil {
-			return fmt.Errorf("API key validation failed: %w", err)
+			if errors.Is(err, ErrServerUnreachable) {
+				log.Printf("[tendrl] server unreachable at startup (%v) — starting offline; messages will buffer until connectivity returns", err)
+			} else {
+				return fmt.Errorf("API key validation failed: %w", err)
+			}
+		} else {
+			c.debugLog("API key validated successfully")
 		}
-		c.debugLog("API key validated successfully")
 	}
 
 	return nil
 }
+
+// ErrServerUnreachable marks a transport-level failure talking to the server —
+// distinct from an authentication rejection.
+var ErrServerUnreachable = errors.New("tendrl server unreachable")
 
 // validateAPIKey checks if the API key is valid by calling the /claims endpoint
 func (c *Client) validateAPIKey() error {
@@ -327,7 +354,10 @@ func (c *Client) validateAPIKey() error {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("claims request failed: %w", err)
+		// Transport-level failure — the server can't be reached, which says
+		// nothing about whether the key is valid. Callers treat this as
+		// "start offline", not as a rejected key.
+		return fmt.Errorf("%w: %v", ErrServerUnreachable, err)
 	}
 	defer resp.Body.Close()
 

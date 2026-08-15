@@ -1,6 +1,7 @@
 package tendrl
 
 import (
+	"encoding/json"
 	"time"
 )
 
@@ -58,10 +59,15 @@ func (c *Client) retryOfflineMessages() {
 				continue
 			}
 
-			// Convert stored message back to Message format
+			// Convert stored message back to Message format. storedMsg.Data is
+			// the JSON text of the original payload (a string). Message.Data is
+			// interface{}, so assigning the raw string would re-marshal it
+			// double-encoded — "data":"{\"k\":1}" instead of "data":{"k":1}" —
+			// which the server rejects with 400. Wrap as json.RawMessage so it
+			// marshals verbatim.
 			msg := Message{
 				MsgType:   "publish", // Default message type for stored messages
-				Data:      storedMsg.Data,
+				Data:      json.RawMessage(storedMsg.Data),
 				Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
 			}
 			// Only add context if tags exist

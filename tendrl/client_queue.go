@@ -69,7 +69,7 @@ func (c *Client) processQueue() {
 								tags = m.Context.Tags
 							}
 							c.storage.Store(
-								time.Now().Format(time.RFC3339),
+								NextStorageKey(),
 								dataStr,
 								tags,
 								3600,
@@ -91,7 +91,7 @@ func (c *Client) processQueue() {
 								tags = m.Context.Tags
 							}
 							c.storage.Store(
-								time.Now().Format(time.RFC3339),
+								NextStorageKey(),
 								dataStr,
 								tags,
 								3600,
