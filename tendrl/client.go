@@ -45,8 +45,8 @@ type Client struct {
 	lastState      map[string]interface{}
 	lastStateInit  bool
 	checkMsgRate   time.Duration // How often to check for messages
-	checkMsgLimit int           // Maximum number of messages to retrieve per check
-	lastMsgCheck  time.Time     // Last time messages were checked
+	checkMsgLimit  int           // Maximum number of messages to retrieve per check
+	lastMsgCheck   time.Time     // Last time messages were checked
 
 	// Heartbeat functionality
 	lastHeartbeat time.Time // Last time heartbeat was sent
