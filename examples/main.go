@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	tendrl "github.com/tendrl-inc-labs/go-sdk/tendrl"
+	tendrl "github.com/tendrl-inc-labs/contact-go/tendrl"
 )
 
 func userSignupMetrics() (interface{}, error) {

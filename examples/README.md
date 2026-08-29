@@ -89,7 +89,7 @@ export TENDRL_KEY="your_api_key_here"
 If you encounter import errors, make sure you're in the `examples` directory and the `go.mod` file includes the replace directive for local development:
 
 ```go
-replace github.com/tendrl-inc-labs/go-sdk => ../
+replace github.com/tendrl-inc-labs/contact-go => ../
 ```
 
 Then run:

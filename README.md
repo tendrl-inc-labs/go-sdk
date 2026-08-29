@@ -1,6 +1,6 @@
 # Tendrl Go SDK
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/tendrl-inc-labs/go-sdk)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/tendrl-inc-labs/contact-go)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/doc/devel/release.html)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
@@ -48,7 +48,7 @@ For licensing questions, contact: `support@tendrl.com`
 ## Installation
 
 ```bash
-go get github.com/tendrl-inc-labs/go-sdk@latest
+go get github.com/tendrl-inc-labs/contact-go@latest
 ```
 
 ## Configuration
@@ -111,7 +111,7 @@ You can also configure the client using a JSON configuration file. The SDK will 
 To generate an example configuration file:
 
 ```go
-import "github.com/tendrl-inc-labs/go-sdk/tendrl"
+import "github.com/tendrl-inc-labs/contact-go/tendrl"
 
 // Generate example config at default location
 err := tendrl.InitializeConfig(tendrl.GetDefaultConfigPath())
@@ -221,7 +221,7 @@ import (
     "log"
     "time"
     
-    tendrl "github.com/tendrl-inc-labs/go-sdk/tendrl"
+    tendrl "github.com/tendrl-inc-labs/contact-go/tendrl"
 )
 
 func main() {
@@ -243,7 +243,7 @@ import (
     "log"
     "time"
     
-    tendrl "github.com/tendrl-inc-labs/go-sdk/tendrl"
+    tendrl "github.com/tendrl-inc-labs/contact-go/tendrl"
 )
 
 func main() {

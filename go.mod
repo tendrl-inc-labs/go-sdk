@@ -1,4 +1,4 @@
-module github.com/tendrl-inc-labs/go-sdk
+module github.com/tendrl-inc-labs/contact-go
 
 go 1.25.0
 
